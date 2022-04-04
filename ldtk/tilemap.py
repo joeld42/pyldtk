@@ -24,6 +24,15 @@ class FlipBits( int, Enum ):
     FlipY = 2
     FlipXY = 3
 
+class TileRenderMode( str, Enum ):
+    Cover = 'Cover'
+    FitInside = 'FitInside'
+    Repeat = 'Repeat'
+    Stretch = 'Stretch'
+    FullSizeCropped = 'FullSizeCropped'
+    FullSizeUncropped = 'FullSizeUncropped'
+    NineSlice = 'NineSlice'
+
 # ===============================================
 #  TilesetDef
 # ===============================================
@@ -32,6 +41,7 @@ class TilesetDef( object ):
 
         self.identifier = "Unnamed Tileset"
         self.relPath = "image_missing.png"
+        self.embedAtlas = None
         self.uid = "ERR"
         self.size = (0, 0)
         self.tileGridSize = 16
@@ -45,6 +55,7 @@ class TilesetDef( object ):
         tileset.uid = data.get('uid')
         tileset.identifier = data.get( 'identifier', "Unnamed Tileset")
         tileset.relPath = data.get( 'relPath', tileset.relPath )
+        tileset.embedAtlas = data.get( 'embedAtlas', tileset.embedAtlas )
         tileset.tileGridSize = data.get( 'tileGridSize', tileset.tileGridSize )
 
         szx = int(data.get('pxWid'))
@@ -132,8 +143,13 @@ class TileLayer( object ):
 
     @staticmethod
     def entities_from_data( entityData ):
-        # TODO: read entities
-        return []
+
+        entities = []
+        for entData in entityData:
+            ent = Entity.from_data( entData )
+            entities.append( ent )
+
+        return entities
 
     @staticmethod
     def tiles_from_data( tileData ):
@@ -144,6 +160,91 @@ class TileLayer( object ):
             tiles.append( t )
 
         return tiles
+
+# ===============================================
+#  TileREct
+# ===============================================
+class TileRect( object ):
+    def __init__(self):
+        self.tilesetUid = '??'
+        self.rect = (0, 0, 16, 16) # x, y, w, h
+
+    @staticmethod
+    def from_data( data ):
+        tileRect = TileRect()
+        tileRect.tilesetUid = data.get( 'tilesetUid')
+        w = data.get( 'w', tileRect.rect[2] )
+        h = data.get( 'h', tileRect.rect[3] )
+        x = data.get('x', tileRect.rect[0])
+        y = data.get('y', tileRect.rect[1])
+        tileRect.rect = ( x, y, w, h )
+
+# ===============================================
+#  EntityDef
+# ===============================================
+class EntityDef( object ):
+    def __init__(self):
+        self.identifier = "Unknown"
+        self.uid = -1
+        self.color = "#ffffff"
+        self.size = ( 10, 10 )
+        self.pivot = ( 0.5, 0.5 )
+        self.tileRenderMode = TileRenderMode.Cover
+        self.tileRect = TileRect()
+        self.nineSliceBorders = []
+
+    @staticmethod
+    def from_data( data ):
+        entDef = EntityDef()
+        entDef.uid = data.get( 'uid' )
+        entDef.identifier = data.get( 'identifier', entDef.identifier )
+        entDef.color = data.get( 'color', entDef.color )
+        w = data.get( 'width' )
+        h = data.get( 'height' )
+        entDef.size = ( w, h )
+        entDef.tileRenderMode = data.get('tileRenderMode', entDef.tileRenderMode )
+
+        entDef.nineSliceBorders = data.get('nineSliceBorders', entDef.nineSliceBorders )
+
+        pivotX = data.get( 'pivotX', entDef.pivot[0] )
+        pivotY = data.get('pivotY', entDef.pivot[1])
+        entDef.pivot = ( pivotX, pivotY )
+
+        tileRectData = data.get( 'tileRect' )
+        if tileRectData:
+            entDef.tileRect = TileRect.from_data( tileRectData )
+
+        return entDef
+
+
+# ===============================================
+#  Entity
+# ===============================================
+class Entity( object ):
+    def __init__(self):
+        self.defUid = -1
+        self.fieldInstances = [] # TODO
+        self.size = ( 16, 16 )
+        self.iid = "??"
+        self.pxy = ( 0, 0 )
+
+    @staticmethod
+    def from_data( data ):
+
+        ent = Entity()
+        ent.iid = data.get( 'iid' )
+        ent.defUid = data.get( 'defUid' )
+        w = data.get( 'width', ent.size[0] )
+        h = data.get( 'height', ent.size[1] )
+        ent.size = (w, h)
+
+        return ent
+
+
+
+
+
+
 
 # ===============================================
 #  Tile
@@ -234,6 +335,7 @@ class TileProject( object ):
         self.levels = []
         self.tilesetDefs = {}
         self.layerDefs = {}
+        self.entityDefs = {}
 
         self.externalLevels = False
 
@@ -272,6 +374,11 @@ class TileProject( object ):
             tilesetDef = TilesetDef.from_dict( tilesetDefData )
 
             proj.tilesetDefs[ tilesetDef.uid ] = tilesetDef
+
+        # Read Entity Defs
+        for entityDefData in defs.get('entities', []):
+            entityDef = EntityDef.from_data( entityDefData )
+            proj.entityDefs[ entityDef.uid ] = entityDef
 
         # Read layer defs
         for layerDefData in defs.get('layers', []):
