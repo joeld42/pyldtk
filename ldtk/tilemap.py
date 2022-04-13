@@ -179,6 +179,8 @@ class TileRect( object ):
         y = data.get('y', tileRect.rect[1])
         tileRect.rect = ( x, y, w, h )
 
+        return tileRect
+
 # ===============================================
 #  EntityDef
 # ===============================================
@@ -190,7 +192,7 @@ class EntityDef( object ):
         self.size = ( 10, 10 )
         self.pivot = ( 0.5, 0.5 )
         self.tileRenderMode = TileRenderMode.Cover
-        self.tileRect = TileRect()
+        self.tileRect = None
         self.nineSliceBorders = []
 
     @staticmethod
@@ -238,6 +240,8 @@ class Entity( object ):
         h = data.get( 'height', ent.size[1] )
         ent.size = (w, h)
 
+        ent.pxy = tuple( data.get( 'px', ent.pxy) )
+
         return ent
 
 
@@ -279,6 +283,13 @@ class TileLevel( object ):
         self.layers = []
         self.collision = []
         self.tiles = []
+
+    # Not sure if this works generally or just
+    # for my case, flips the weird LDTK Y-down to
+    # Y-up
+    def flippedPos(self, p ):
+        result = ( p[0], - (p[1] + self.size[1]) )
+        return result
 
     @staticmethod
     def from_dict( data ):
